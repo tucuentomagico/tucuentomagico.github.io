@@ -72,8 +72,9 @@
     --ui: "Segoe UI Rounded","Segoe UI",-apple-system,"SF Pro Rounded",
           "Nunito","Quicksand",system-ui,sans-serif;
 
-    /* Tamaño del álbum: cuadrado, dominante, dejando aire para la barra */
-    --album: min(94vmin, 92vw, 84vh);
+    /* Tamaño del álbum: cuadrado y dominante, dejando aire arriba para el
+       botón de repetir y abajo para la barra de controles. */
+    --album: min(94vmin, 92vw, 76vh);
   }
 
   *{ box-sizing:border-box; margin:0; padding:0; }
@@ -241,8 +242,10 @@
   .ctrl.active{ background:var(--accent); color:#fff; }
 
   /* Altavoz por lámina (repetir su narración) — arriba a la derecha */
+  /* Va FUERA de la lámina, encima del cuadro: dentro tapaba el texto del
+     cuento, que viene impreso en la propia ilustración. */
   #speaker{
-    position:absolute; top:12px; right:12px; z-index:10;
+    position:absolute; top:-58px; right:0; z-index:10;
     width:48px; height:48px; border:none; border-radius:50%;
     background:rgba(253,251,246,.9);
     box-shadow:0 5px 14px rgba(90,68,38,.24);
@@ -308,10 +311,12 @@
 
   /* ── Móvil: controles cómodos, láminas dominantes ─────────────────────── */
   @media (max-width:560px){
-    :root{ --album: min(96vmin, 96vw, 78vh); }
+    :root{ --album: min(96vmin, 96vw, 72vh); }
+    #bottombar{ gap:8px; }
+    #counter{ min-width:auto; padding:8px 10px; font-size:14px; }
     .arrow{ width:50px; height:50px; font-size:23px; }
     #arrowBack{ left:2px; } #arrowNext{ right:2px; }
-    #speaker{ width:46px; height:46px; font-size:20px; top:10px; right:10px; }
+    #speaker{ width:46px; height:46px; font-size:20px; top:-54px; right:0; }
   }
   /* Landscape en móvil: reserva alto para la barra inferior (sin solapes) */
   @media (max-height:520px){
@@ -353,7 +358,6 @@
       <div class="curl"></div>
     </div>
 
-    <button id="speaker" title="Escuchar esta lámina" aria-label="Escuchar esta lámina">🔊</button>
 
     <!-- Puerta de inicio: portada 00.png + botón (habilita el sonido) -->
     <div id="startGate">
@@ -366,6 +370,9 @@
 
   <button class="arrow" id="arrowBack" aria-label="Lámina anterior">‹</button>
   <button class="arrow" id="arrowNext" aria-label="Lámina siguiente">›</button>
+
+  <!-- Fuera del libro: repetir la narración de esta lámina sin tapar el dibujo -->
+  <button id="speaker" title="Escuchar esta lámina otra vez" aria-label="Escuchar esta lámina otra vez">🔊</button>
 </div>
 
 <!-- Barra inferior -->
@@ -373,6 +380,7 @@
   <button class="ctrl" id="btnAudio" title="Controles de sonido" aria-label="Controles de sonido">🎚️</button>
   <button class="ctrl" id="btnAuto" title="Escuchar el cuento solo (pasa las hojas automáticamente)" aria-label="Reproducción automática">▶</button>
   <div id="counter">Portada</div>
+  <button class="ctrl" id="btnMute" title="Pausar todo el sonido (voz y música)" aria-label="Pausar el sonido">🔊</button>
   <button class="ctrl" id="btnFull" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>
 </div>
 
@@ -420,7 +428,8 @@
   const pageUnder=$("pageUnder"), counter=$("counter"), speaker=$("speaker");
   const arrowBack=$("arrowBack"), arrowNext=$("arrowNext"),
         zoneBack=$("zoneBack"), zoneNext=$("zoneNext");
-  const btnFull=$("btnFull"), btnAudio=$("btnAudio"), audioPanel=$("audioPanel"), btnAuto=$("btnAuto");
+  const btnFull=$("btnFull"), btnAudio=$("btnAudio"), audioPanel=$("audioPanel"),
+        btnAuto=$("btnAuto"), btnMute=$("btnMute");
   const startGate=$("startGate"), startBtn=$("startBtn");
   const tgDialog=$("tgDialog"), tgMusic=$("tgMusic"), btnMaster=$("btnMaster");
   const volDialog=$("volDialog"), volMusic=$("volMusic");
@@ -700,18 +709,32 @@
   tgMusic.addEventListener("click",(e)=>{ e.stopPropagation();
     musicOn=!musicOn; syncToggles(); ensureMusic();
   });
-  btnMaster.addEventListener("click",(e)=>{ e.stopPropagation();
-    muted=!muted; syncToggles();
-    if(muted && autoPlay) stopAuto();
-    if(muted){ narrator.pause(); music.pause(); }
-    else{ ensureMusic(); if(dialogOn) playNarration(current); }
-  });
+  // Pausa general: detiene voz Y música. Es el botón que se usa cuando se deja
+  // de leer el cuento, para que no siga sonando la música de fondo.
+  function toggleMuteAll(){
+    muted = !muted;
+    syncToggles();
+    if(muted){
+      if(autoPlay) stopAuto();
+      narrator.pause();
+      music.pause();
+    }else{
+      ensureMusic();
+      if(dialogOn) playNarration(current);
+    }
+  }
+  btnMaster.addEventListener("click",(e)=>{ e.stopPropagation(); toggleMuteAll(); });
+  btnMute.addEventListener("click",  (e)=>{ e.stopPropagation(); toggleMuteAll(); blur(); });
 
   function syncToggles(){
     tgDialog.classList.toggle("on", dialogOn && !muted);
     tgMusic.classList.toggle("on",  musicOn  && !muted);
     btnMaster.classList.toggle("on", muted);
     btnMaster.textContent = muted ? "🔇 Silenciado" : "🔊 Silenciar todo";
+    // El botón de la barra refleja siempre el mismo estado
+    btnMute.classList.toggle("active", muted);
+    btnMute.textContent = muted ? "🔇" : "🔊";
+    btnMute.title = muted ? "Volver a activar el sonido" : "Pausar todo el sonido (voz y música)";
   }
 
   // Altavoz por lámina: repetir / detener su narración
